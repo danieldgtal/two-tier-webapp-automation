@@ -1,0 +1,28 @@
+---
+- name: Install and update httpd
+  hosts: all
+  become: yes
+  tasks:
+    - name: Install httpd (Apache)
+      package:
+        name: httpd
+        state: present
+      # This ensures that httpd is installed
+
+    - name: Start and enable httpd service
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+      # Ensure that httpd is running and will start on boot
+
+    - name: Update httpd package to latest
+      package:
+        name: httpd
+        state: latest
+      # Ensures that the httpd package is up-to-date
+
+    - name: Check the status of the httpd service
+      service:
+        name: httpd
+        state: started

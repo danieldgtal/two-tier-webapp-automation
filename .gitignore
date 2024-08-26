@@ -1,6 +1,5 @@
 # Ignore Terraform directories and files
 .terraform/
-.terraform.lock.hcl
 terraform.tfstate
 terraform.tfstate.backup
 
@@ -9,3 +8,7 @@ crash.log
 .terraformrc
 terraform.rc
 
+# Ignore all Terraform modules
+.terraform/
+.tfstate
+.tfstate.backup
