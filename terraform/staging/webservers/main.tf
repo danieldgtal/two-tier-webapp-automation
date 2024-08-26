@@ -10,6 +10,7 @@ terraform {
 
   required_version = ">=0.14"
 }
+
 provider "aws" {
   profile = "default"
   region  = "us-east-1"
@@ -23,6 +24,7 @@ data "terraform_remote_state" "network" { // This is to use Outputs from Remote 
     region = "us-east-1"                     // Region where bucket created
   }
 }
+
 
 # Data source for AMI id
 data "aws_ami" "latest_amazon_linux" {
@@ -52,135 +54,206 @@ resource "aws_key_pair" "group8_staging" {
   public_key = file("~/.ssh/${var.prefix}.pub")
 }
 
+# locals for subnet and security group mappings
+locals {
+  web_servers = {
+    "webServer1" = {
+      subnet_id = data.terraform_remote_state.network.outputs.public_subnet_ids[0]
+      security_groups = [data.terraform_remote_state.network.outputs.ssh_http_sg]
+      public_ip = true
+    }
+    "webServer2" = {
+      subnet_id = data.terraform_remote_state.network.outputs.public_subnet_ids[1]
+      security_groups = [data.terraform_remote_state.network.outputs.ssh_http_sg]
+      public_ip = true
+      name_override = "webserver2-bastion"
+    }
+    "webServer3" = {
+      subnet_id = data.terraform_remote_state.network.outputs.public_subnet_ids[2]
+      security_groups = [data.terraform_remote_state.network.outputs.ssh_http_sg]
+      public_ip = true
+    }
+    "webServer4" = {
+      subnet_id = data.terraform_remote_state.network.outputs.public_subnet_ids[3]
+      security_groups = [data.terraform_remote_state.network.outputs.ssh_http_sg]
+      public_ip = true
+    }
+    "webServer5" = {
+      subnet_id = data.terraform_remote_state.network.outputs.private_subnet_ids[0]
+      security_groups = [data.terraform_remote_state.network.outputs.ssh_only]
+      public_ip = false
+    }
+    "vm6" = {
+      subnet_id = data.terraform_remote_state.network.outputs.private_subnet_ids[1]
+      security_groups = [data.terraform_remote_state.network.outputs.ssh_only]
+      public_ip = false
+    }
+  }
+}
+
+# Webserver instances using for_each
+resource "aws_instance" "web_servers" {
+  for_each                   = local.web_servers
+  ami                        = data.aws_ami.latest_amazon_linux.id
+  instance_type              = lookup(var.instance_type, var.env)
+  key_name                   = aws_key_pair.group8_staging.key_name
+  subnet_id                  = each.value.subnet_id
+  security_groups            = each.value.security_groups
+  associate_public_ip_address = each.value.public_ip
+
+  user_data = lookup(each.value, "user_data", templatefile("./install_httpd.sh.tpl",
+    {
+      env           = upper(var.env),
+      prefix        = upper(var.prefix)
+      instance_name = upper(each.key)
+    })
+  )
+
+  root_block_device {
+    encrypted = var.env == "test" ? true : false
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = merge(local.default_tags,
+    {
+      "Name" = "${var.prefix}-${lookup(each.value, "name_override", each.key)}"
+    }
+  )
+}
+
+
 # VM1 | Webserver1 | Public Subnet1
-resource "aws_instance" "webServer1" {
-  ami                         = data.aws_ami.latest_amazon_linux.id
-  instance_type               = lookup(var.instance_type, var.env)
-  key_name                    = aws_key_pair.group8_staging.key_name
-  security_groups             = [data.terraform_remote_state.network.outputs.ssh_http_sg]
-  subnet_id                   = data.terraform_remote_state.network.outputs.public_subnet_ids[0] # Public Subnet 1
-  associate_public_ip_address = true
+# resource "aws_instance" "webServer1" {
+#   ami                         = var.ami_id
+#   instance_type               = lookup(var.instance_type, var.env)
+#   key_name                    = var.key_name
+#   security_groups             = [data.terraform_remote_state.network.outputs.ssh_http_sg]
+#   subnet_id                   = data.terraform_remote_state.network.outputs.public_subnet_ids[0] # Public Subnet 1
+#   associate_public_ip_address = true
 
-  user_data = templatefile("./install_httpd.sh.tpl",
-    {
-      env           = upper(var.env),
-      prefix        = upper(var.prefix)
-      instance_name = upper(var.webServerNames[0])
-    }
-  )
+#   user_data = templatefile("./install_httpd.sh.tpl",
+#     {
+#       env           = upper(var.env),
+#       prefix        = upper(var.prefix)
+#       instance_name = upper(var.webServerNames[0])
+#     }
+#   )
 
-  root_block_device {
-    encrypted = var.env == "test" ? true : false
-  }
+#   root_block_device {
+#     encrypted = var.env == "test" ? true : false
+#   }
 
-  lifecycle {
-    create_before_destroy = true
-  }
+#   lifecycle {
+#     create_before_destroy = true
+#   }
 
-  tags = merge(local.default_tags,
-    {
-      "Name" = "${var.prefix}-webserver1"
-    }
-  )
-}
+#   tags = merge(local.default_tags,
+#     {
+#       "Name" = "${var.prefix}-webserver1"
+#     }
+#   )
+# }
 
-# VM3 | Webserver3 | Public Subnet3
-resource "aws_instance" "webServer3" {
-  ami                         = data.aws_ami.latest_amazon_linux.id
-  instance_type               = lookup(var.instance_type, var.env)
-  key_name                    = aws_key_pair.group8_staging.key_name
-  security_groups             = [data.terraform_remote_state.network.outputs.ssh_http_sg]
-  subnet_id                   = data.terraform_remote_state.network.outputs.public_subnet_ids[2] # Public Subnet 3
-  associate_public_ip_address = true
+# # VM3 | Webserver3 | Public Subnet3
+# resource "aws_instance" "webServer3" {
+#   ami                         = data.aws_ami.latest_amazon_linux.id
+#   instance_type               = lookup(var.instance_type, var.env)
+#   key_name                    = aws_key_pair.group8_staging.key_name
+#   security_groups             = [data.terraform_remote_state.network.outputs.ssh_http_sg]
+#   subnet_id                   = data.terraform_remote_state.network.outputs.public_subnet_ids[2] # Public Subnet 3
+#   associate_public_ip_address = true
 
-  user_data = templatefile("./install_httpd.sh.tpl",
-    {
-      env           = upper(var.env),
-      prefix        = upper(var.prefix)
-      instance_name = upper(var.webServerNames[2])
-    }
-  )
+#   user_data = templatefile("./install_httpd.sh.tpl",
+#     {
+#       env           = upper(var.env),
+#       prefix        = upper(var.prefix)
+#       instance_name = upper(var.webServerNames[2])
+#     }
+#   )
 
-  root_block_device {
-    encrypted = var.env == "test" ? true : false
-  }
+#   root_block_device {
+#     encrypted = var.env == "test" ? true : false
+#   }
 
-  lifecycle {
-    create_before_destroy = true
-  }
+#   lifecycle {
+#     create_before_destroy = true
+#   }
 
-  tags = merge(local.default_tags,
-    {
-      "Name" = "${var.prefix}-webserver3"
-    }
-  )
-}
+#   tags = merge(local.default_tags,
+#     {
+#       "Name" = "${var.prefix}-webserver3"
+#     }
+#   )
+# }
 
-# VM2 | Webserver2 | Public Subnet2
-resource "aws_instance" "webServer2" {
-  ami                         = data.aws_ami.latest_amazon_linux.id
-  instance_type               = lookup(var.instance_type, var.env)
-  key_name                    = aws_key_pair.group8_staging.key_name
-  security_groups             = [data.terraform_remote_state.network.outputs.ssh_http_sg]
-  subnet_id                   = data.terraform_remote_state.network.outputs.public_subnet_ids[1]  # Public Subnet 2
-  associate_public_ip_address = true
+# # VM2 | Webserver2 | Public Subnet2
+# resource "aws_instance" "webServer2" {
+#   ami                         = data.aws_ami.latest_amazon_linux.id
+#   instance_type               = lookup(var.instance_type, var.env)
+#   key_name                    = aws_key_pair.group8_staging.key_name
+#   security_groups             = [data.terraform_remote_state.network.outputs.ssh_http_sg]
+#   subnet_id                   = data.terraform_remote_state.network.outputs.public_subnet_ids[1]  # Public Subnet 2
+#   associate_public_ip_address = true
 
-  tags = merge(local.default_tags,
-    {
-      "Name" = "${var.prefix}-webserver2-bastion"
-    }
-  )
-}
+#   tags = merge(local.default_tags,
+#     {
+#       "Name" = "${var.prefix}-webserver2-bastion"
+#     }
+#   )
+# }
 
-# VM4 | Webserver4 | Public Subnet4
-resource "aws_instance" "webServer4" {
-  ami                         = data.aws_ami.latest_amazon_linux.id
-  instance_type               = lookup(var.instance_type, var.env)
-  key_name                    = aws_key_pair.group8_staging.key_name
-  security_groups             = [data.terraform_remote_state.network.outputs.ssh_http_sg]
-  subnet_id                   = data.terraform_remote_state.network.outputs.public_subnet_ids[3]  # Public Subnet 2
-  associate_public_ip_address = true
+# # VM4 | Webserver4 | Public Subnet4
+# resource "aws_instance" "webServer4" {
+#   ami                         = data.aws_ami.latest_amazon_linux.id
+#   instance_type               = lookup(var.instance_type, var.env)
+#   key_name                    = aws_key_pair.group8_staging.key_name
+#   security_groups             = [data.terraform_remote_state.network.outputs.ssh_http_sg]
+#   subnet_id                   = data.terraform_remote_state.network.outputs.public_subnet_ids[3]  # Public Subnet 2
+#   associate_public_ip_address = true
 
-  tags = merge(local.default_tags,
-    {
-      "Name" = "${var.prefix}-webserver4"
-    }
-  )
-}
+#   tags = merge(local.default_tags,
+#     {
+#       "Name" = "${var.prefix}-webserver4"
+#     }
+#   )
+# }
 
+# # Webserver 5 
+# resource "aws_instance" "webServer5" {
+#   ami                         = data.aws_ami.latest_amazon_linux.id
+#   instance_type               = lookup(var.instance_type, var.env)
+#   key_name                    = aws_key_pair.group8_staging.key_name
+#   security_groups             = [data.terraform_remote_state.network.outputs.ssh_only]
+#   subnet_id                   = data.terraform_remote_state.network.outputs.private_subnet_ids[0]  # Private Subnet 1
+#   associate_public_ip_address = false
 
-resource "aws_instance" "webServer5" {
-  ami                         = data.aws_ami.latest_amazon_linux.id
-  instance_type               = lookup(var.instance_type, var.env)
-  key_name                    = aws_key_pair.group8_staging.key_name
-  security_groups             = [data.terraform_remote_state.network.outputs.ssh_only]
-  subnet_id                   = data.terraform_remote_state.network.outputs.private_subnet_ids[0]  # Private Subnet 1
-  associate_public_ip_address = false
+#   tags = merge(local.default_tags,
+#     {
+#       "Name" = "${var.prefix}-webServer5"
+#     }
+#   )
+# }
 
-  tags = merge(local.default_tags,
-    {
-      "Name" = "${var.prefix}-webServer5"
-    }
-  )
-}
+# # WEbservers 6
+# resource "aws_instance" "vm6" {
+#   ami                         = data.aws_ami.latest_amazon_linux.id
+#   instance_type               = lookup(var.instance_type, var.env)
+#   key_name                    = aws_key_pair.group8_staging.key_name
+#   security_groups             = [data.terraform_remote_state.network.outputs.ssh_only]
+#   subnet_id                   = data.terraform_remote_state.network.outputs.private_subnet_ids[1]  # Private Subnet 2
+#   associate_public_ip_address = false
 
+#   tags = merge(local.default_tags,
+#     {
+#       "Name" = "${var.prefix}-VM6"
+#     }
+#   )
+# }
 
-resource "aws_instance" "vm6" {
-  ami                         = data.aws_ami.latest_amazon_linux.id
-  instance_type               = lookup(var.instance_type, var.env)
-  key_name                    = aws_key_pair.group8_staging.key_name
-  security_groups             = [data.terraform_remote_state.network.outputs.ssh_only]
-  subnet_id                   = data.terraform_remote_state.network.outputs.private_subnet_ids[1]  # Private Subnet 2
-  associate_public_ip_address = false
-
-  tags = merge(local.default_tags,
-    {
-      "Name" = "${var.prefix}-VM6"
-    }
-  )
-}
-
-
+# Applilcation load balancer
 resource "aws_lb" "app_lb" {
   name               = "app-lb"
   internal           = false

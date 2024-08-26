@@ -7,6 +7,13 @@ variable "instance_type" {
   type        = map(string)
 }
 
+
+
+variable "associate_public_ip_address" {
+  type = bool
+  default = true
+}
+
 # Default tags
 variable "default_tags" {
   default = {
@@ -35,5 +42,6 @@ variable "env" {
 # WebServer Names
 variable "webServerNames" {
   type    = list(string)
-  default = ["webServer1", "webServer2", "webServer3", "webServer4", "webServer5", "webServer6"]
+  default = ["webServer1", "webServer2", "webServer3", "webServer4", "webServer5", "vm6"]
 }
+
