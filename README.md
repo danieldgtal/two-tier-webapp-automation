@@ -1,6 +1,14 @@
 # ACS730 Final Project: Two-Tier Static Web Application Hosting and Configuration Solution
 ## Overview
 This project demonstrates the deployment of a two-tier static web application on AWS using Terraform for infrastructure provisioning, Ansible for configuration management, and GitHub Actions for CI/CD automation. The infrastructure consists of 6 VMs across 4 public and 2 private subnets in different availability zones.
+
+## Prerequisites
+<ul>
+  <li>S3 Buckets</li>
+  <li>SSH Keypair</li>
+  <li>GitHub Repo</li>
+</ul>
+
 ## Architecture
 <ul>
   <li>VPC and Subnets</li>
@@ -50,13 +58,4 @@ Apply the terraform configurations to provision the VPC, subnts, NAT Gateway, an
 
 ## License
 This project is licensed under the MIT License.
-=======
-# ACS730 Summer 2024 Final Project Deployment
-## Overview
-This README provides instructions to successfully deploy the architecture depicted in the provided project diagram. The architecture includes multiple EC2 instances, an Auto Scaling group, a load balancer, and S3 buckets for storing Terraform state and serving images to the web servers.
-## Prerequisites
-<ul>
-  <li>S3 Buckets</li>
-  <li>SSH Keypair</li>
-  <li>GitHub Repo</li>
-</ul>
+==========
